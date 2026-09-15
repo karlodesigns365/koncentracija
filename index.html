@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Koncentracija - Interaktivna Radna Bilježnica</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Google Fontovi za dječji/prijateljski izgled -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Gornja traka s informacijama -->
+    <header class="top-bar">
+      <div class="brand-title">
+        <span class="icon">🚀</span>
+        <div>
+          <h1 id="page-title">KONCENTRACIJA</h1>
+          <span id="page-subtitle">Vježbenica za djecu</span>
+        </div>
+      </div>
+      
+      <div class="page-badge">
+        <span id="page-indicator">Stranica 1 / 48</span>
+      </div>
+    </header>
+
+    <!-- Interaktivni prikaz stranice -->
+    <main class="page-viewport" id="swipe-area">
+      <div class="page-card" id="page-card">
+        <img id="bg-image" src="images/1.png" alt="Stranica bilježnice">
+        <div id="interactive-layer" class="interactive-layer"></div>
+      </div>
+    </main>
+
+    <!-- Navigacijska traka pri dnu -->
+    <footer class="bottom-bar">
+      <button id="btn-prev" class="nav-btn prev-btn">
+        <span class="arrow">⬅</span>
+        <span class="btn-text">Prethodna</span>
+      </button>
+
+      <div class="page-dropdown-container">
+        <label for="page-select" class="select-label">📖 Stranica:</label>
+        <select id="page-select" class="page-select"></select>
+      </div>
+
+      <button id="btn-next" class="nav-btn next-btn">
+        <span class="btn-text">Sljedeća</span>
+        <span class="arrow">➡</span>
+      </button>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
