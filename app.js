@@ -220,15 +220,26 @@ const pagesConfig = {
     ]
   },
 
-  20: {
-    hint: '👉 Pročitaj izjave i napiši tko je po tebi kriv u svakoj situaciji.',
-    tip: 'Isti ili slični odgovori nisu uvijek dokaz istine – uvijek provjeri informacije!',
-    type: 'text-panel',
-    questions: [
-      { q: 'Tko je razbio vazu?' },
-      { q: 'Tko je pojeo čokoladu?' },
-      { q: 'Tko je zalio bilježnicu vodom?' },
-    ]
+20: {
+    hint: '👉 Redom pretpostavi da je svaka osoba krivac i provjeri sve izjave.',
+    tip: 'Provjeri jednog po jednog! Označi ✓ za istinu i ✗ za laž. Klikni jednom za ✓, a dvaput za ✗!',
+    type: 'logic-table',
+    tableGrid: {
+      x: 0.334,
+      y: 0.565,
+      w: 0.380,
+      h: 0.160,
+      rows: 4,
+      cols: 4
+    },
+    // Pomaknuto udesno (0.742) i dolje (0.570), te lagano rastegnuto visinski (0.164)
+    counterGrid: {
+      x: 0.742,
+      y: 0.570,
+      w: 0.090,
+      h: 0.164,
+      rows: 4
+    }
   },
 
 21: {
@@ -1237,42 +1248,154 @@ function renderTrueFalse(pageNum, cfg, panel) {
   panel.appendChild(btn);
 }
 
-// ---- choice-groups (bez provjere) ----
-function renderChoiceGroups(pageNum, cfg, panel) {
-  buildHintBlock(panel, cfg, pageNum);
+// ---- logic-table (novi ZADATAK 4) ----
+function renderLogicTableCanvas(pageNum, cfg, taskPanel) {
+  const layer = document.getElementById('interactive-layer');
+  buildHintBlock(taskPanel, cfg, pageNum);
+
   const state = Store.get(pageNum);
-  const picks = state.picks || {};
+  let userMatrix = state.userMatrix || Array(4).fill(null).map(() => Array(4).fill(null));
 
-  cfg.groups.forEach((g, gi) => {
-    const box = ce('div', 'group-box');
-    box.appendChild(ce('div', 'qa-label', g.title));
-    const row = ce('div', 'chip-row');
-    g.options.forEach(opt => {
-      const chip = ce('button', 'chip' + (picks[gi] === opt ? ' selected' : ''), opt);
-      chip.addEventListener('click', () => {
-        picks[gi] = opt; Store.patch(pageNum, { picks });
-        row.querySelectorAll('.chip').forEach(c => c.classList.remove('selected', 'correct', 'incorrect'));
-        chip.classList.add('selected');
+  const inkCanvas = document.createElement('canvas');
+  inkCanvas.className = 'draw-canvas';
+  inkCanvas.style.pointerEvents = 'auto';
+  inkCanvas.style.touchAction = 'manipulation';
+  layer.appendChild(inkCanvas);
+
+  const ctx = inkCanvas.getContext('2d');
+
+  function getBoxes() {
+    const w = inkCanvas.width;
+    const h = inkCanvas.height;
+    
+    // 1. Kutije za 4x4 kvačice/križiće
+    const g = cfg.tableGrid;
+    const stepX = (g.w * w) / g.cols;
+    const stepY = (g.h * h) / g.rows;
+    const startX = g.x * w;
+    const startY = g.y * h;
+
+    const checkCells = [];
+    for (let r = 0; r < g.rows; r++) {
+      for (let c = 0; c < g.cols; c++) {
+        checkCells.push({
+          row: r,
+          col: c,
+          x: startX + c * stepX,
+          y: startY + r * stepY,
+          w: stepX,
+          h: stepY
+        });
+      }
+    }
+
+    // 2. Kutije za brojač (5. stupac)
+    const cG = cfg.counterGrid;
+    const cStartX = cG.x * w;
+    const cStartY = cG.y * h;
+    const cStepY = (cG.h * h) / cG.rows;
+    const cWidth = cG.w * w;
+
+    const counterCells = [];
+    for (let r = 0; r < cG.rows; r++) {
+      counterCells.push({
+        row: r,
+        x: cStartX,
+        y: cStartY + r * cStepY,
+        w: cWidth,
+        h: cStepY
       });
-      row.appendChild(chip);
+    }
+
+    return { checkCells, counterCells };
+  }
+
+  function redraw() {
+    ctx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+    const { checkCells, counterCells } = getBoxes();
+
+    // Iscrtaj 4x4 kvačice i križiće
+    checkCells.forEach(box => {
+      const val = userMatrix[box.row][box.col];
+      if (val !== null) {
+        ctx.font = 'bold 22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        if (val === true) {
+          ctx.fillStyle = '#15803d';
+          ctx.fillText('✓', box.x + box.w / 2, box.y + box.h / 2);
+        } else {
+          ctx.fillStyle = '#dc2626';
+          ctx.fillText('✗', box.x + box.w / 2, box.y + box.h / 2);
+        }
+      }
     });
-    box.appendChild(row);
-    box._row = row; box._answer = g.answer;
-    panel.appendChild(box);
+
+    // Iscrtaj brojač u 5. stupcu
+// Iscrtaj brojač u 5. stupcu (Responzivno u postotcima)
+    counterCells.forEach(box => {
+      const rowValues = userMatrix[box.row];
+      const trueCount = rowValues.filter(v => v === true).length;
+      const totalFilled = rowValues.filter(v => v !== null).length;
+
+      if (totalFilled > 0) {
+        // Dinamička veličina fonta ovisno o visini ćelije (uvijek proporcionalno)
+        const fontSize = Math.round(box.h * 0.75); 
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#1e293b';
+
+        // Progresivni pomak po visini u postotcima [% visine ćelije]:
+        // Red 0: 0%, Red 1: 5%, Red 2: 12%, Red 3: 20% visine ćelije prema dolje
+        const rowPercentShift = [0, 0.05, 0.12, 0.20];
+        
+        const finalX = box.x + box.w / 2;
+        const finalY = box.y + box.h / 2 + (box.h * rowPercentShift[box.row]);
+
+        ctx.fillText(trueCount.toString(), finalX, finalY);
+      }
+    });
+  }
+
+  inkCanvas.addEventListener('pointerdown', (e) => {
+    if (e.targetTouches && e.targetTouches.length > 1) return;
+
+    const rect = inkCanvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const { checkCells } = getBoxes();
+    const hitBox = checkCells.find(b => 
+      clickX >= b.x && clickX <= b.x + b.w &&
+      clickY >= b.y && clickY <= b.y + b.h
+    );
+
+    if (hitBox) {
+      const curr = userMatrix[hitBox.row][hitBox.col];
+      if (curr === null) userMatrix[hitBox.row][hitBox.col] = true;
+      else if (curr === true) userMatrix[hitBox.row][hitBox.col] = false;
+      else userMatrix[hitBox.row][hitBox.col] = null;
+
+      Store.patch(pageNum, { userMatrix });
+      redraw();
+    }
   });
 
-  const btn = ce('button', 'check-btn', '✅ Provjeri odgovore');
-  btn.addEventListener('click', () => {
-    panel.querySelectorAll('.group-box').forEach((box, gi) => {
-      const sel = picks[gi];
-      box._row.querySelectorAll('.chip').forEach(c => {
-        c.classList.remove('correct', 'incorrect');
-        if (c.textContent === box._answer) c.classList.add('correct');
-        else if (c.textContent === sel) c.classList.add('incorrect');
-      });
-    });
+  function resize() {
+    const rect = layer.getBoundingClientRect();
+    inkCanvas.width = rect.width;
+    inkCanvas.height = rect.height;
+    redraw();
+  }
+
+  resize();
+  window.addEventListener('resize', resize);
+
+  onPageCleanup(() => {
+    window.removeEventListener('resize', resize);
   });
-  panel.appendChild(btn);
 }
 
 // ---- memory ----
@@ -1548,7 +1671,7 @@ function renderInteractiveElements(pageNum, cfg) {
   }
   pageViewport.classList.add('with-panel');
 
-  switch (cfg.type) {
+switch (cfg.type) {
     case 'drag-rings': renderDragRings(pageNum, cfg, taskPanel); break;
     case 'tally-mark': renderTallyMark(pageNum, cfg, taskPanel); break;
     case 'draw-canvas': renderDrawCanvas(pageNum, cfg, taskPanel); break;
@@ -1558,13 +1681,14 @@ function renderInteractiveElements(pageNum, cfg) {
     case 'choice-panel': renderChoicePanel(pageNum, cfg, taskPanel); break;
     case 'truefalse': renderTrueFalse(pageNum, cfg, taskPanel); break;
     case 'choice-groups': renderChoiceGroups(pageNum, cfg, taskPanel); break;
+    case 'logic-table': renderLogicTableCanvas(pageNum, cfg, taskPanel); break;
     case 'memory': renderMemory(pageNum, cfg, taskPanel); break;
     case 'table-fill': renderTableFill(pageNum, cfg, taskPanel); break;
     case 'assign': renderAssign(pageNum, cfg, taskPanel); break;
     case 'order-panel': renderOrderPanel(pageNum, cfg, taskPanel); break;
     case 'self-assessment': renderSelfAssessment(pageNum, taskPanel); break;
     case 'diploma': renderDiploma(pageNum, taskPanel); break;
-	case 'checklist': renderChecklist(pageNum, cfg, taskPanel); break;
+    case 'checklist': renderChecklist(pageNum, cfg, taskPanel); break;
     default: pageViewport.classList.remove('with-panel');
   }
 }
